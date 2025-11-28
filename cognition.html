@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>SmartHeal — Reflex Tester</title>
+<style>
+  :root{
+    --bg:#0f1724; --card:#0b1220; --accent:#06b6d4; --good:#16a34a; --bad:#ef4444; --muted:#9ca3af;
+  }
+  body{
+    margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;
+    background:linear-gradient(180deg,#071024 0%,var(--bg) 100%); color:#e6eef6;
+    display:flex; align-items:flex-start; justify-content:center; min-height:100vh; padding:28px;
+  }
+  .container{width:100%; max-width:1000px;}
+  header{display:flex; align-items:center; gap:18px; margin-bottom:18px;}
+  h1{margin:0; font-size:22px; letter-spacing:0.2px;}
+  .subtitle{color:var(--muted); font-size:13px;}
+  .grid{display:grid; grid-template-columns: 430px 1fr; gap:18px;}
+  .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px; padding:18px; box-shadow: 0 6px 20px rgba(2,6,23,0.6); }
+  .controls{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;}
+  button{background:var(--accent); color:#022; border:0; padding:10px 12px; border-radius:8px; font-weight:600; cursor:pointer;}
+  button.secondary{background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,0.04);}
+  .test-block{border-radius:10px; padding:12px; background:rgba(255,255,255,0.02); margin-bottom:10px;}
+  .big-btn{display:inline-block; padding:12px 16px; border-radius:10px; background:#0ea5a; cursor:pointer;}
+  .center{display:flex; align-items:center; justify-content:center;}
+  #visualArea{height:160px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:20px; user-select:none;}
+  #visualTarget{width:160px; height:100px; border-radius:8px; background:#111827; display:flex; align-items:center; justify-content:center; color:var(--muted); font-weight:700;}
+  .meter{display:flex; gap:10px; align-items:center;}
+  .score{font-size:20px; font-weight:700;}
+  .small{font-size:13px; color:var(--muted);}
+  .report{display:flex; gap:12px; flex-direction:column; margin-top:12px;}
+  .row{display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px dashed rgba(255,255,255,0.02);}
+  .badge{padding:6px 10px; border-radius:999px; font-weight:700; font-size:13px;}
+  .good{background:linear-gradient(90deg,#064e3b,#16a34a); color:white;}
+  .warn{background:linear-gradient(90deg,#92400e,#f59e0b); color:white;}
+  .bad{background:linear-gradient(90deg,#7f1d1d,#ef4444); color:white;}
+  footer{margin-top:14px; color:var(--muted); font-size:12px;}
+  /* simple mobile */
+  @media (max-width:920px){ .grid{grid-template-columns:1fr; } #visualArea{height:120px} }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>SmartHeal — Reflex Tester</h1>
+        <div class="subtitle">Visual, Audio & Cognitive reflex tests · Quick health alert & recommendation</div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- LEFT: Controls / Tests -->
+      <div class="card">
+        <div class="controls">
+          <button id="startAll">Start Full Test</button>
+          <button id="resetBtn" class="secondary">Reset</button>
+          <button id="instructions" class="secondary">Instructions</button>
+        </div>
+
+        <div class="test-block">
+          <h3 style="margin:4px 0 8px 0">1) Visual Reaction</h3>
+          <div class="small">When the box turns <strong style="color:#bbf7d0">GREEN</strong>, click the box (or press <kbd>Space</kbd>) as fast as you can.</div>
+          <div id="visualArea" class="center" style="margin-top:10px;">
+            <div id="visualTarget">Ready</div>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:8px;">
+            <div class="small">Trials: <span id="visualTrials">0</span></div>
+            <div class="small">Last: <span id="visualLast">-</span> ms</div>
+            <div class="small">Avg: <span id="visualAvg">-</span> ms</div>
+          </div>
+          <div style="margin-top:8px;">
+            <button id="startVisual" class="secondary">Start Visual Test</button>
+            <button id="stopVisual" class="secondary">Stop</button>
+            <button id="visualSingle" class="secondary">Single Trial</button>
+          </div>
+        </div>
+
+        <div class="test-block">
+          <h3 style="margin:4px 0 8px 0">2) Audio Reflex</h3>
+          <div class="small">When you hear a beep, say <strong>“Yes”</strong> (or any clear word). App measures response delay using speech recognition.</div>
+          <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
+            <button id="startAudio" class="secondary">Start Audio Test</button>
+            <button id="audioSingle" class="secondary">Single Trial</button>
+            <div class="small">Last: <span id="audioLast">-</span> ms</div>
+          </div>
+          <div class="small" style="margin-top:8px">Microphone: <span id="micStatus">Not requested</span></div>
+        </div>
+
+        <div class="test-block">
+          <h3 style="margin:4px 0 8px 0">3) Cognitive Switch (Stroop-like)</h3>
+          <div class="small">Click the button describing the <strong>meaning</strong> of the word (not the color). Fast switching = good focus.</div>
+          <div style="margin-top:10px;" id="cogArea">
+            <div id="cogWord" style="font-size:30px; font-weight:800; margin-bottom:8px; color:#fff">—</div>
+            <div style="display:flex; gap:8px;">
+              <button id="cogBtnLeft" class="secondary">Left</button>
+              <button id="cogBtnRight" class="secondary">Right</button>
+            </div>
+            <div style="margin-top:8px;" class="small">Trials: <span id="cogTrials">0</span> — Accuracy: <span id="cogAcc">-</span>% — Avg RT: <span id="cogAvg">-</span> ms</div>
+            <div style="margin-top:8px;">
+              <button id="startCog" class="secondary">Start Cognitive Test</button>
+              <button id="cogSingle" class="secondary">Single Trial</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;" class="small">Tip: Run all three tests for a meaningful Smart Reflex Score.</div>
+      </div>
+
+      <!-- RIGHT: Dashboard / Report -->
+      <div class="card">
+        <h3 style="margin-top:0">Dashboard</h3>
+        <div class="row">
+          <div>
+            <div class="small">Visual Reaction</div>
+            <div class="score" id="dashVisual">— ms</div>
+          </div>
+          <div>
+            <div class="small">Audio Reflex</div>
+            <div class="score" id="dashAudio">— ms</div>
+          </div>
+          <div>
+            <div class="small">Cognitive</div>
+            <div class="score" id="dashCog">—</div>
+          </div>
+        </div>
+
+        <div class="report">
+          <div class="row"><div class="small">Combined Smart Reflex Score</div><div id="combinedScore" class="badge warn">—</div></div>
+          <div class="row"><div class="small">Health Flags</div><div id="flags" class="small">None</div></div>
+          <div class="row"><div class="small">Recommendation</div><div id="recommendation" class="small">—</div></div>
+          <div style="margin-top:6px;">
+            <button id="generateReport">Generate Report</button>
+            <button id="downloadCSV" class="secondary">Download CSV</button>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <h4 style="margin:6px 0">Live View</h4>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <video id="selfView" autoplay playsinline muted style="width:120px; height:90px; background:#020617; border-radius:8px;"></video>
+            <div class="small">Self-view (optional). Allow camera if you want to show judge.</div>
+          </div>
+        </div>
+
+        <footer>
+          <div>Build: SmartHeal Reflex Tester • No data leaves your browser</div>
+        </footer>
+      </div>
+    </div>
+  </div>
+
+<script>
+/*
+SmartHeal Reflex Tester
+- Visual Reaction: shows a target that turns green after random delay. Measures click latency.
+- Audio Reflex: plays a beep and uses SpeechRecognition to detect user's spoken reply; measures delay.
+- Cognitive Switch: Stroop-like: word meaning vs color. Click correct meaning -> measures accuracy & RT.
+- Generates combined score and recommendations.
+
+No external libs required. Uses Web Speech API (Chrome/Edge) for voice recognition.
+*/
+
+// ------- utility helpers
+const $ = id => document.getElementById(id);
+function mean(arr){ if(!arr.length) return null; return Math.round(arr.reduce((a,b)=>a+b,0)/arr.length); }
+
+// ------- Live camera (optional)
+async function startCamera(){
+  try{
+    const v = $('selfView');
+    const stream = await navigator.mediaDevices.getUserMedia({video:true, audio:false});
+    v.srcObject = stream;
+  }catch(e){
+    // camera optional
+    console.log('camera denied or not present', e);
+  }
+}
+// Try start camera but don't block
+startCamera().catch(()=>{});
+
+// --------------- VISUAL REACTION ---------------
+let visualRunning=false, visualTimeout=null;
+let visualTrials = [], visualStartTime=0, visualPending=false;
+
+function startVisual(repeat=true){
+  if(visualRunning) return;
+  visualRunning = true;
+  $('visualTrials').innerText = '0';
+  visualTrials = [];
+  if(repeat) visualCycle();
+}
+function stopVisual(){
+  visualRunning = false;
+  clearTimeout(visualTimeout);
+  visualPending=false;
+  $('visualTarget').innerText='Stopped';
+}
+function visualSingleTrial(){
+  if(visualPending) return;
+  visualPending = true;
+  $('visualTarget').style.background='#111827';
+  $('visualTarget').innerText = 'Get Ready';
+  const delay = 700 + Math.floor(Math.random()*1800); // 700-2500 ms
+  visualTimeout = setTimeout(()=> {
+    $('visualTarget').style.background='#16a34a';
+    $('visualTarget').innerText='CLICK!';
+    visualStartTime = performance.now();
+  }, delay);
+}
+function visualCycle(){
+  // automatic repeat every trial
+  visualSingleTrial();
+  // wait until user clicks, then schedule next
+}
+$('visualTarget').addEventListener('click', handleVisualClick);
+document.addEventListener('keydown', (e)=>{ if(e.code==='Space') handleVisualClick(); });
+function handleVisualClick(){
+  if(!visualPending) return;
+  if(visualStartTime === 0){
+    // clicked too early (before green)
+    // ignore
+    return;
+  }
+  const rt = Math.round(performance.now() - visualStartTime);
+  visualTrials.push(rt);
+  $('visualTrials').innerText = visualTrials.length;
+  $('visualLast').innerText = rt;
+  $('visualAvg').innerText = mean(visualTrials) ?? '-';
+  // reset state
+  visualStartTime = 0;
+  visualPending = false;
+  $('visualTarget').style.background='#111827';
+  $('visualTarget').innerText='Ready';
+  // schedule next automatic trial if running
+  if(visualRunning){
+    setTimeout(()=>{ visualCycle(); }, 700);
+  }
+}
+
+// small helper to ensure visualSingleTrial sets visualPending properly when green appears
+(function patchVisualPending(){
+  const orig = visualSingleTrial;
+  visualSingleTrial = function(){
+    if(visualPending) return;
+    visualPending = true;
+    $('visualTarget').style.background='#111827';
+    $('visualTarget').innerText = 'Get Ready';
+    const delay = 700 + Math.floor(Math.random()*1800);
+    visualTimeout = setTimeout(()=> {
+      $('visualTarget').style.background='#16a34a';
+      $('visualTarget').innerText='CLICK!';
+      visualStartTime = performance.now();
+    }, delay);
+  };
+})();
+
+// UI hooks
+$('startVisual').addEventListener('click', ()=> startVisual(true));
+$('stopVisual').addEventListener('click', ()=> stopVisual());
+$('visualSingle').addEventListener('click', ()=> visualSingleTrial());
+
+// --------------- AUDIO REFLEX ---------------
+let audioRunning=false;
+let audioLastRT = null;
+let audioTrials = [];
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognizer = null;
+let lastBeepTime = 0;
+let expectingSpeech = false;
+
+function initSpeech(){
+  if(!SpeechRecognition) {
+    $('micStatus').innerText = 'SpeechRecognition not supported (use Chrome/Edge)';
+    return;
+  }
+  try{
+    recognizer = new SpeechRecognition();
+    recognizer.lang = 'en-US';
+    recognizer.interimResults = false;
+    recognizer.maxAlternatives = 1;
+    recognizer.onstart = ()=>{ $('micStatus').innerText = 'Listening...'; };
+    recognizer.onresult = (ev) => {
+      if(!expectingSpeech) return;
+      const now = performance.now();
+      const rt = Math.round(now - lastBeepTime);
+      audioTrials.push(rt);
+      audioLastRT = rt;
+      $('audioLast').innerText = rt;
+      $('dashAudio').innerText = rt + ' ms';
+      expectingSpeech = false;
+      recognizer.stop();
+    };
+    recognizer.onerror = (ev) => {
+      console.log('recognizer error', ev.error);
+      expectingSpeech = false;
+      $('micStatus').innerText = 'Error: ' + ev.error;
+    };
+    recognizer.onend = ()=>{ if(expectingSpeech){ $('micStatus').innerText = 'Awaiting speech...'; } else { $('micStatus').innerText = 'Idle'; } };
+    $('micStatus').innerText = 'Ready';
+  }catch(e){
+    console.error('speech init err', e);
+    $('micStatus').innerText = 'Speech init error';
+  }
+}
+initSpeech();
+
+function playBeepAndListen(){
+  // beep
+  const ac = new (window.AudioContext || window.webkitAudioContext)();
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = 'sine';
+  o.frequency.value = 880;
+  g.gain.value = 0.0015; // low volume initially
+  o.connect(g); g.connect(ac.destination);
+  o.start();
+  // ramp volume up quickly then down
+  g.gain.exponentialRampToValueAtTime(0.08, ac.currentTime + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.14);
+  setTimeout(()=>{ o.stop(); ac.close(); }, 180);
+
+  lastBeepTime = performance.now();
+  expectingSpeech = true;
+
+  // start listening (speech recognition)
+  if(recognizer){
+    try{
+      recognizer.start();
+    }catch(e){
+      // sometimes start() can throw if already started - ignore
+      console.warn('recognizer start err', e);
+    }
+  }
+}
+
+$('startAudio').addEventListener('click', ()=> {
+  audioRunning = true;
+  audioTrials = [];
+  $('audioLast').innerText = '-';
+  $('dashAudio').innerText = '—';
+  $('micStatus').innerText = 'Requesting mic (if needed)';
+  // do single trial to prompt mic access
+  setTimeout(()=> { playBeepAndListen(); }, 400);
+});
+
+$('audioSingle').addEventListener('click', ()=> {
+  playBeepAndListen();
+});
+
+// --------------- COGNITIVE SWITCH TEST ---------------
+let cogRunning=false;
+let cogTrialsArr = [];
+let cogCorrect=0;
+let cogPending=false;
+let cogStartTime=0;
+
+const colorNames = ['RED','GREEN','BLUE','YELLOW'];
+const colorValues = {'RED':'#ef4444','GREEN':'#16a34a','BLUE':'#0ea5a','YELLOW':'#f59e0b'};
+
+function newCogTrial(){
+  // pick meaning word and display in a random color (Stroop effect)
+  const meaning = colorNames[Math.floor(Math.random()*colorNames.length)];
+  let color = colorValues[colorNames[Math.floor(Math.random()*colorNames.length)]];
+  // ensure sometimes it's incongruent
+  if(Math.random() > 0.45) {
+    // force incongruent color
+    while(Object.values(colorValues).includes(color) && color === colorValues[meaning]) {
+      color = colorValues[colorNames[Math.floor(Math.random()*colorNames.length)]];
+    }
+  }
+  $('cogWord').innerText = meaning;
+  $('cogWord').style.color = color;
+  // set left/right button labels to two color meanings, one is correct (the meaning, not the color)
+  const choices = [...colorNames].sort(()=>0.5 - Math.random()).slice(0,2);
+  if(!choices.includes(meaning)) choices[0] = meaning; // ensure correct present
+  $('cogBtnLeft').innerText = choices[0];
+  $('cogBtnRight').innerText = choices[1];
+  cogPending = true;
+  cogStartTime = performance.now();
+}
+
+$('startCog').addEventListener('click', ()=> {
+  cogRunning = true;
+  cogTrialsArr = [];
+  cogCorrect = 0;
+  $('cogTrials').innerText = 0;
+  $('cogAcc').innerText = '-';
+  $('cogAvg').innerText = '-';
+  newCogTrial();
+});
+$('cogSingle').addEventListener('click', ()=> { newCogTrial(); });
+
+$('cogBtnLeft').addEventListener('click', ()=> handleCogChoice($('cogBtnLeft').innerText) );
+$('cogBtnRight').addEventListener('click', ()=> handleCogChoice($('cogBtnRight').innerText) );
+
+function handleCogChoice(choice){
+  if(!cogPending) return;
+  const rt = Math.round(performance.now() - cogStartTime);
+  const correct = (choice === $('cogWord').innerText);
+  cogTrialsArr.push(rt);
+  if(correct) cogCorrect++;
+  $('cogTrials').innerText = cogTrialsArr.length;
+  $('cogAcc').innerText = Math.round((cogCorrect / cogTrialsArr.length) * 100);
+  $('cogAvg').innerText = mean(cogTrialsArr);
+  cogPending=false;
+  if(cogRunning){
+    setTimeout(()=>{ newCogTrial(); }, 500);
+  }
+}
+
+// ------------- Combined Score & Report -------------
+function computeCombined(){
+  // Visual average
+  const vAvg = visualTrials.length ? mean(visualTrials) : null;
+  const aAvg = audioTrials.length ? mean(audioTrials) : null;
+  const cAvg = cogTrialsArr.length ? mean(cogTrialsArr) : null;
+  // Basic scoring heuristics:
+  // lower times => better. We'll create normalized subscores 0-100 (higher=better)
+  function timeToScore(t, best, worst){
+    if(t===null) return null;
+    const clamped = Math.max(Math.min(t,worst),best);
+    const p = (worst - clamped) / (worst - best);
+    return Math.round(p * 100);
+  }
+  const vScore = timeToScore(vAvg, 160, 500); // 160ms excellent, 500ms poor
+  const aScore = timeToScore(aAvg, 200, 900); // 200ms excellent, 900ms poor
+  const cScore = timeToScore(cAvg, 350, 1200); // 350ms excellent, 1200 poor
+  // if cognitive accuracy matters, weigh it
+  const acc = cogTrialsArr.length ? (cogCorrect / cogTrialsArr.length) : 0.75;
+  const cogFinal = cScore ? Math.round(cScore * (0.6 + 0.4*acc)) : null;
+
+  // average available scores
+  const subs = [vScore, aScore, cogFinal].filter(x => x !== null);
+  const combined = subs.length ? Math.round(subs.reduce((s,v)=>s+v,0)/subs.length) : null;
+  return {vAvg, aAvg, cAvg, vScore, aScore, cogFinal, combined, acc};
+}
+
+$('generateReport').addEventListener('click', ()=> {
+  const r = computeCombined();
+  // update dashboard
+  $('dashVisual').innerText = r.vAvg ? r.vAvg + ' ms' : '—';
+  $('dashAudio').innerText = r.aAvg ? r.aAvg + ' ms' : '—';
+  $('dashCog').innerText = r.cAvg ? Math.round(r.cAvg) + ' ms' : '—';
+  // combined badge
+  if(r.combined === null){ $('combinedScore').innerText = 'Run tests'; $('combinedScore').className='badge warn'; }
+  else{
+    $('combinedScore').innerText = r.combined;
+    if(r.combined >= 75) { $('combinedScore').className='badge good'; }
+    else if(r.combined >= 45) { $('combinedScore').className='badge warn'; }
+    else { $('combinedScore').className='badge bad'; }
+  }
+  // flags & recommendation
+  const flags = [];
+  const recs = [];
+  if(r.vAvg && r.vAvg > 350) flags.push('Slow visual reaction');
+  if(r.aAvg && r.aAvg > 650) flags.push('Slow audio reflex');
+  if(r.cAvg && r.cAvg > 1000) flags.push('Slowed cognitive switching');
+  if(r.combined && r.combined < 50) recs.push('Take rest, hydrate, re-test in 30 mins.');
+  if(r.combined && r.combined >= 50 && r.combined < 75) recs.push('Light break & hydration recommended.');
+  if(r.combined && r.combined >= 75) recs.push('Normal reflexes for now.');
+  if(!flags.length) flags.push('No major flags detected');
+  $('flags').innerText = flags.join(' • ');
+  $('recommendation').innerText = recs.join(' ');
+});
+
+// -------------- CSV download --------------
+$('downloadCSV').addEventListener('click', ()=> {
+  const now = new Date().toISOString();
+  const r = computeCombined();
+  const rows = [
+    ['timestamp','visual_avg_ms','audio_avg_ms','cog_avg_ms','combined_score'],
+    [now, r.vAvg ?? '', r.aAvg ?? '', r.cAvg ?? '', r.combined ?? '']
+  ];
+  const csv = rows.map(r=> r.join(',')).join('\n');
+  const blob = new Blob([csv], {type: 'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'smartheal_reflex_' + (new Date()).toISOString().slice(0,19) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ------------- Start All (sequence) -------------
+$('startAll').addEventListener('click', async ()=> {
+  // start visual 5 trials, audio 3 trials, cognitive 6 trials
+  visualTrials = []; cogTrialsArr = []; audioTrials = [];
+  startVisual(true);
+  // run visual for ~6 trials (~6-8s) then stop, then audio, then cognitive
+  // but we need non-blocking sequence; we'll do approximate timing
+  // visual runs automatically until stopped; schedule stop
+  setTimeout(()=> { stopVisual(); }, 7000);
+
+  // schedule a few audio trials after visual
+  setTimeout(()=> {
+    // request mic/permission by running single beep
+    playBeepAndListen();
+    setTimeout(()=> playBeepAndListen(), 1200);
+    setTimeout(()=> playBeepAndListen(), 2400);
+  }, 8000);
+
+  // schedule cognitive after audio trials
+  setTimeout(()=> {
+    cogRunning = true;
+    cogTrialsArr = []; cogCorrect = 0;
+    newCogTrial();
+    // run ~6 trials
+    setTimeout(()=> { cogRunning = false; }, 6000);
+  }, 12000);
+
+  // final report generation
+  setTimeout(()=> { $('generateReport').click(); }, 19000);
+});
+
+// optional: instructions modal (simple alert)
+$('instructions').addEventListener('click', ()=> {
+  alert("Instructions:\\n\\n1) Visual: Click the box or press Space as soon as it turns green.\\n2) Audio: Say 'Yes' after you hear the beep. Use Chrome for best speech support.\\n3) Cognitive: Click the button that matches the WORD meaning (ignore the color).\\n\\nRun all tests with 'Start Full Test' and then press 'Generate Report'.");
+});
+
+// reset
+$('resetBtn').addEventListener('click', ()=> {
+  visualRunning=false; visualTrials=[]; cogRunning=false; cogTrialsArr=[]; audioTrials=[];
+  $('visualTrials').innerText='0'; $('visualLast').innerText='-'; $('visualAvg').innerText='-';
+  $('audioLast').innerText='-'; $('dashAudio').innerText='—';
+  $('cogTrials').innerText='0'; $('cogAcc').innerText='-'; $('cogAvg').innerText='-';
+  $('dashVisual').innerText='— ms'; $('dashCog').innerText='—';
+  $('combinedScore').innerText='—'; $('combinedScore').className='badge warn';
+  $('flags').innerText='None'; $('recommendation').innerText='—';
+});
+</script>
+</body>
+</html>
